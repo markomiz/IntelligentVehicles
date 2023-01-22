@@ -1,12 +1,12 @@
 import numpy as np
-
+from math import *
 
 class Node:
     def __init__(self, pose):
         self.pose = pose
         self.connections = []
         self.parent = None
-        self.cost = np.inf
+        self.cost = 0
 
 class QuadTree:
     def __init__(self, xmin, ymin, xmax, ymax, depth=0):
@@ -49,11 +49,38 @@ class QuadTree:
     def get_nearest(self, point, radius=0.3):
         r = radius
         neighbors = []
+        self.find_neighbors_r(point, r, neighbors)
         while len(neighbors) == 0:
             self.find_neighbors_r(point, r, neighbors)
-            r *= 1.1
+            r *= 1.5
         
         return neighbors
+
+    def get_single_near(self, point):
+        min_dist = np.inf
+        nearest = None
+        x = point[0]
+        y = point[1]
+        for p in self.points:
+            dist = sqrt((x-p.pose[0])**2 + (y-p.pose[1])**2)
+            if dist < min_dist:
+                nearest = p
+                min_dist = dist
+
+        for child in self.children:
+            search = False
+            if nearest is None:
+                search  = True
+            else: 
+                if child.xmin <= nearest.pose[0] + min_dist and nearest.pose[0] - min_dist <= child.xmax and child.ymin <= nearest.pose[1] + min_dist and nearest.pose[1] - min_dist <= child.ymax:
+                    search = True
+            if search:
+                n, dist = child.get_single_near(point)
+                if dist < min_dist:
+                    nearest = n
+                    min_dist = dist
+        return nearest, min_dist
+
 
     def find_neighbors_r(self, point, radius, neighbors):
         x = point[0]
@@ -79,13 +106,16 @@ class Graph:
         self.all_nodes.add_node(n)
         return n
 
-    def add_edge(self,p1, p2):
+    def add_edge(self,p1, p2, cost):
         p2.parent = p1
+        p2.cost = p1.cost + cost
         
-    def get_near(self, point):
-        neighbours = self.all_nodes.get_nearest(point)
-
+    def get_near(self, point, radius = 0.1):
+        neighbours = self.all_nodes.get_nearest(point, radius)
         return neighbours
+
+    def get_single_near(self, point):
+        return self.all_nodes.get_single_near(point)
 
 
     def dist(self, p1, p2):

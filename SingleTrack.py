@@ -15,12 +15,12 @@ class Simulator:
         self.p2m = 20 # pixel to meter
         self.images = []
         self.dt = 0.1 # s
-        self.img_w = 600
-        self.img_h = 600
+        self.img_w = 1000
+        self.img_h = 1000
         self.state = torch.zeros(4)
         self.nu = 25
         self.spot_center = np.zeros(2)
-        self.create_spot()
+        # self.create_spot()
         self.last_cost = 0.0
 
     def step(self, action):
@@ -42,8 +42,8 @@ class Simulator:
         W = self.car.W * self.p2m
         L = self.car.L * self.p2m
         # define the angle at which to draw the rectangle (in degrees)
-        x_c = self.img_w/2  + self.car.x * self.p2m
-        y_c = self.img_h/2 - self.car.y * self.p2m # flip because images have flipped y
+        x_c = 10  + self.car.x * self.p2m
+        y_c = 10 + self.img_h - self.car.y * self.p2m # flip because images have flipped y
         c_th = - self.car.theta # flip because images have flipped y
         x0 = x_c - L/2 * cos(c_th) - W/2 * sin(c_th)
         y0 = y_c - L/2 * sin(c_th) + W/2 * cos(c_th)
@@ -57,12 +57,12 @@ class Simulator:
         # draw the rectangle
         draw.polygon([(x0, y0), (x1, y1), (x2, y2), (x3, y3)], fill=(255, 255, 255))
 
-        # draw spot
-        draw.polygon(self.spot, fill=(50, 200, 50))
+        # # draw spot
+        # draw.polygon(self.spot, fill=(50, 200, 50))
 
-        cost_points = [(1,1), (int(self.last_cost* self.img_h), 1)]
+        # cost_points = [(1,1), (int(self.last_cost* self.img_h), 1)]
  
-        draw.line(cost_points, fill ="red", width = 6)
+        # draw.line(cost_points, fill ="red", width = 6)
 
         self.images.append(image)
     
@@ -122,6 +122,8 @@ class Simulator:
 
 class SingleTrackVehicleModel:
     def __init__(self):
+        self.img_w = 1000
+        self.img_h = 1000
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
@@ -132,11 +134,13 @@ class SingleTrackVehicleModel:
         self.max_steer = pi / 4.0
         self.W = 1.5
         self.max_acc = 3.0
+        self.p2m = 30 # pixel to meter
+        self.images = []
 
     def get_pos_as_vec(self):
         return np.array([self.x,self.y, self.theta])
 
-    def update(self, dt, steering_angle, acceleration, noise=False):
+    def update(self, dt, steering_angle, acceleration, noise=False, images=False):
         self.steering_angle = steering_angle
         self.velocity += acceleration * dt
         self.velocity = min(self.velocity,self.max_velocity)
@@ -148,14 +152,44 @@ class SingleTrackVehicleModel:
             self.y += np.random.normal(0,0.01)
             self.theta += np.random.normal(0,0.01)
         self.theta = (self.theta + pi)  % (2 * pi) - pi
+        if images:
+            self.draw()
+
+    def draw(self):
+
+        image = Image.new("RGB", (self.img_w, self.img_h), (100, 100, 100))
+        # Draw a rectangle on the image
+        draw = ImageDraw.Draw(image)
+        W = self.W * self.p2m
+        L = self.L * self.p2m
+        # define the angle at which to draw the rectangle (in degrees)
+        x_c = 2*self.p2m  + self.x * self.p2m
+        y_c = -2*self.p2m + self.img_h - self.y * self.p2m # flip because images have flipped y
+        c_th = - self.theta # flip because images have flipped y
+        x0 = x_c - L/2 * cos(c_th) - W/2 * sin(c_th)
+        y0 = y_c - L/2 * sin(c_th) + W/2 * cos(c_th)
+        x1 = x_c - L/2 * cos(c_th) + W/2 * sin(c_th)
+        y1 = y_c - L/2 * sin(c_th) - W/2 * cos(c_th)
+        x2 = x_c + L/2 * cos(c_th) + W/2 * sin(c_th)
+        y2 = y_c + L/2 * sin(c_th) - W/2 * cos(c_th)
+        x3 = x_c + L/2 * cos(c_th) - W/2 * sin(c_th)
+        y3 = y_c + L/2 * sin(c_th) + W/2 * cos(c_th)
+
+        draw.polygon([(x0, y0), (x1, y1), (x2, y2), (x3, y3)], fill=(255, 255, 255))
+        draw.polygon([(6*self.p2m + 2*self.p2m, self.img_h - 6*self.p2m - 2*self.p2m), (6*self.p2m + 2*self.p2m, self.img_h - 19*self.p2m - 2*self.p2m), (19*self.p2m + 2*self.p2m, self.img_h -19*self.p2m - 2*self.p2m), (19*self.p2m + 2*self.p2m,self.img_h - 6*self.p2m - 2*self.p2m)], fill=(255, 50, 50))
+        self.images.append(image)
+
+    def save_gif(self, name=""):
+        self.images[0].save('car'+ name +'.gif',
+        save_all=True, append_images=self.images[1:], loop=0)
         
 
 
 class LatController:
     def __init__(self):
-        self.kh = 1.5
-        self.kp = .8
-        self.lookahead_distance = 0.2  # Lookahead distance
+        self.kh = 0.8
+        self.kp = 0.8
+        self.lookahead_distance = 1.0  # Lookahead distance
 
     def control(self, trajectory, pose):
         lookahead = np.zeros(2)
@@ -179,7 +213,7 @@ class LatController:
 
 class LongController:
     def __init__(self):
-        self.cruise_speed = 1.0
+        self.cruise_speed = 5.0
         self.k = 0.1
     
     def control(self, vehicle_speed, dt):
@@ -188,28 +222,31 @@ class LongController:
         return self.k * acc
 
 if __name__ == '__main__':
-    dt = 0.01
+    dt = 0.05
     lat = LatController()
     long = LongController()
     car = SingleTrackVehicleModel()
-    planner = RRT(1.0)
-    path = planner.planning(20000)
-    path = np.flip(path, axis=0)
+    planner = RRTStar(0.3)
+    path_orig = planner.planning(5000)
+    path_orig = np.flip(path_orig, axis=0)
+    path = planner.interpolate_polyline(path_orig, 1000)
     car_points = []
     n = 0
-    while sqrt((car.x - path[-1,0])**2 + (car.y - path[-1,1])**2) > 1 and n < 6000:
+    while sqrt((car.x - path[-1,0])**2 + (car.y - path[-1,1])**2) > 1 and n < 600:
 
         car_points.append(car.get_pos_as_vec())
         acc = lat.control(path,car.get_pos_as_vec())
         steer = long.control(car.velocity, dt)
         if abs(steer) > car.max_steer:
             steer = car.max_steer * steer/abs(steer)
-        car.update(dt, acc, steer)
+        car.update(dt, acc, steer, False, True)
         n+=1
 
-    plt.plot(path[:,0], path[:,1], label="Planned Path")
+    plt.plot(path_orig[:,0], path_orig[:,1], label="Planned Path")
+    plt.plot(path[:,0], path[:,1], label="Interpolated Path")
     car_points = np.array(car_points)
     print(car_points)
+    car.save_gif("hey")
     plt.plot(car_points[:,0], car_points[:,1], label="Actual Trajectory")
     obstacle = np.array([[5.5,5.5], [5.5,19.5],[19.5,19.5],[19.5,5.5], [5.5,5.5]])
     plt.plot(obstacle[:,0], obstacle[:,1], label="Obstacle")
