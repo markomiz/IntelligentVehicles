@@ -226,8 +226,8 @@ if __name__ == '__main__':
     lat = LatController()
     long = LongController()
     car = SingleTrackVehicleModel()
-    planner = RRTStar(0.3)
-    path_orig = planner.planning(5000)
+    planner = RRTStar(0.5)
+    path_orig = planner.planning(50000)
     path_orig = np.flip(path_orig, axis=0)
     path = planner.interpolate_polyline(path_orig, 1000)
     car_points = []
